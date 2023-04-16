@@ -27,7 +27,7 @@ Inspired by [Chika](https://github.com/phunanon/Chika),
 [Kuan](https://github.com/phunanon/Kuan).
 
 - [**Main Github repository**](https://github.com/phunanon/Insitux)
-- [**Roblox-ts NPM package**](https://www.npmjs.com/package/@rbxts/insitux) and its [Github repository](https://github.com/insitux/rbxts-Insitux)
+- [**Roblox-TS NPM package**](https://www.npmjs.com/package/@rbxts/insitux) and its [Github repository](https://github.com/insitux/rbxts-Insitux)
 - [YouTube tutorials and demonstrations playlist](https://www.youtube.com/watch?v=iKOuzXhs14A&list=PLOKSmPXGYmewQI3dNBubTNljRD2C4Dg0z)
 
 Works in Node, the web, and Roblox.
@@ -145,11 +145,11 @@ built-in operations each within an example, with results after a `→`.
 → ["Patrick" 1 2 3]
 
 ;Redefines a var or let by applying a function and arguments to it
-;Note: internally rewrites the expression e.g. (var! a + 10) → (var a (+ a 10))
+;Note: internally rewrites the expression e.g. (var! a + 10) → (var a (+ 10 a))
 (var a 10)
 (let b [:a :b :c])
 (var! a inc)  → 11
-(var! a + 10) → 21
+(var! a - 15) → 5
 (let! b 1) → :b
 [a b] → [21 :b]
 
@@ -459,6 +459,13 @@ etc
 (loop 3 i (print-str i) i-limit) → 0123
 (loop (rand 10) i i) ;Loops up to ten times
 
+;Loops its body over a vector, string, or dictionary
+;Note: the provided item and index is available as e.g. i-item i-index
+(loop-over [0 1 2 3] i (print-str i))   → 0123null
+(loop-over "hello" i (print-str i))     → hellonull
+(loop-over {:a 1 :b 2} i (print-str i)) → [:a 1][:b 2]null
+(loop-over [] x x)                      → null
+
 ;Returns the first argument; returns the last argument
 (val 3 2 1 (print-str "hello"))
 → hello3
@@ -476,7 +483,8 @@ etc
 (omit [1] {[1] 1 :b 2}) → {:b 2}
 
 ;Removes value with index from a vector
-(drop 1 [:a :b :c]) → [:a :c]
+(drop 1 [:a :b :c])  → [:a :c]
+(drop -1 [:a :b :c]) → [:a :b]
 
 ;Associates a value to a key in a dictionary
 (assoc :a 2 {:a 1 :b 2}) → {:a 2, :b 2}
@@ -509,10 +517,12 @@ etc
 (skip 1 "hello")      → "ello"
 (first 2 "hello")     → "he"
 (last 2 "hello")      → "lo"
+(trunc 2 "hello")     → "hel"
 (crop 1 1 "hello")    → "ell"
-(crop 0 -3 "abcdef")  → "abc"
-(crop -3 0 "abcdef")  → "def"
-(crop -4 -4 "abcdef") → "cd"
+;edge-case examples
+(crop 0 -3 "abcdefghi")  → "abc"
+(crop -3 0 "abcdefghi")  → "ghi"
+(crop -4 -7 "abcdefghi") → "fg"
 
 ;Take or skip vector items or string characters until condition is no longer met
 (take-while odd? [1 3 2 4 5 7]) → [1 3]
@@ -629,6 +639,12 @@ etc
 (partition 2 (range 8))       → [[0 1] [2 3] [4 5] [6 7]]
 (partition 3 "Hello, world!") → ["Hel" "lo," " wo" "rld" "!"]
 
+;Returns a vector or string with each Nth item/char
+(skip-each 1 (range 8))  → [0 2 4 6]
+(skip-each 2 "Insitux")  → "Iix"
+(skip-each 0 [0 1 2 3])  → [0 1 2 3]
+(skip-each 9 (range 50)) → [0 10 20 30 40]
+
 ;Returns dictionary with keys as distinct vector items, string characters,
 ;  with values as number of occurrences
 (freqs [0 0 1 2 3]) → {0 2, 1 1, 2 1, 3 1}
@@ -726,16 +742,20 @@ etc
 (set-at [0 1] :a [[0 1] [0 1]]) → [[0 :a] [0 1]]
 (set-at [0 :a] :c [{:a :b}])    → [{:a :c}]
 (set-at [:b] :c {:a [:b]})      → {:a [:b], :b :c}
-(set-at [5 0] 1 [0 1 2])        → [0 1 2]
+(set-at [-1] :a [0 1 2])        → [0 1 :a]
+;Does nothing
+(set-at [5] 1 [0 1 2])          → [0 1 2]
 (set-at [0 0] 1 [:a])           → [:a]
 
 ;Returns vector or dictionary with specified index or key/value set or replaced
 ;  with another value, as returned from a specified function
-(update-at [0] inc [0])       → [1]
-(update-at [5 0] inc [0 1 2]) → [0 1 2]
+(update-at [0] inc [0 1])     → [1 1]
+(update-at [-1] inc [0 1 2])  → [0 1 3]
 (update-at [0 1] upper-case
   [["hi" "hello"] ["hi" "hello"]])
 → [["hi" "HELLO"] ["hi" "hello"]]
+;Does nothing
+(update-at [5 0] inc [0 1 2]) → [0 1 2]
 
 ;Takes functions and returns a function that returns a vector of the result of
 ;  applying each function to those arguments
@@ -759,6 +779,12 @@ etc
 ((toggle :cozy :compact) :cozy)    → :compact
 ((toggle :cozy :compact) :compact) → :cozy
 ((toggle :cozy :compact) :hello)   → :hello
+
+;Returns a closure which returns true or false based on multiple criteria
+;Note: the evalution short-circuits on falsey values
+((criteria num? (< 5) odd?) 11) → true
+((criteria [0 1 2] [1 2 3]) 2)  → true
+((criteria [0 1 2] [3 4 5]) 10) → false
 
 ;Treats its arguments as an expression, first argument as the expression head
 (. + 2 2) → 4
@@ -802,9 +828,10 @@ etc
 
 ;Returns arity, type, and other information about specified function
 (about +)
-→ {:external? false, :minimum-arity 2, :in-types ["num"], :out-types ["num"]}
+→ {:name "+", :external? false, :minimum-arity 2, :in-types ["num"],
+   :out-types ["num"]}
 (about "about")
-→ {:external? false, :exact-arity 1, :in-types [["str" "func"]],
+→ {:name "about", :external? false, :exact-arity 1, :in-types [["str" "func"]],
    :out-types ["dict"]}
 
 ;Resets an Insitux session back to how it started
@@ -1287,6 +1314,5 @@ vector item or string character is "destructured" into.
 **and to shame myself that they still exist.**  
 ⚠️ (= {:a 1 :b 2} {:b 2 :a 1}) -> false  
 ⚠️ don't capture #(var x x) - write test for it  
-⚠️ (loop 3 i (print (+ 1 i)))  
 ⚠️ syntax highlighter omits commas  
 ⚠️ ((let x) 1) x - doesn't work

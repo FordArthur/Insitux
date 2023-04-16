@@ -5,9 +5,9 @@ type State = { dict: Map<string, Val>; output: string };
 
 function get(state: State, key: string): ValOrErr {
   if (!state.dict.has(key)) {
-    return { kind: "err", err: `"${key}" not found.` };
+    return { err: `"${key}" not found.` };
   }
-  return { kind: "val", value: state.dict.get(key)! };
+  return state.dict.get(key)!;
 }
 
 function set(state: State, key: string, val: Val): string | undefined {
@@ -22,9 +22,9 @@ function exe(state: State, name: string, args: Val[]): ValOrErr {
       state.output += args[0].v + "\n";
       break;
     default:
-      return { kind: "err", err: `operation "${name}" does not exist` };
+      return { err: `operation "${name}" does not exist` };
   }
-  return { kind: "val", value: nullVal };
+  return nullVal;
 }
 
 const tests: {
@@ -104,7 +104,7 @@ const tests: {
     code: `(var f 1) (f [:a :b :c])`,
     out: `:b`,
   },
-  { name: "Apply op to var", code: `(var a 10) (var! a + 10)`, out: `20` },
+  { name: "Apply op to var", code: `(var a 5) (var! a - 10)`, out: `5` },
   {
     name: "Apply op to let",
     code: `(let a 10) (let! a (if true + -) (+ 2 3) 5)`,
@@ -160,6 +160,16 @@ const tests: {
     name: "Loop",
     code: `(loop 3 i (print-str i))`,
     out: `012null`,
+  },
+  {
+    name: "Loop over",
+    code: `(let v [0 1 2]) (loop-over v x (print-str x))`,
+    out: `012null`,
+  },
+  {
+    name: "Loop over empty",
+    code: `(loop-over [] x (print x))`,
+    out: `null`,
   },
   {
     name: "Catch error",
@@ -394,8 +404,8 @@ const tests: {
              (if (< n 2) n
                (+ (fib (dec n))
                   (fib (- n 2)))))
-           (fib 13)`,
-    out: `233`,
+           (fib 6)`,
+    out: `8`,
   },
   {
     name: "dedupe (recur)",
@@ -482,16 +492,16 @@ export function doTests(
         exe: (name: string, args: Val[]) => exe(state, name, args),
         functions: {},
         env,
-        loopBudget: 10000,
-        rangeBudget: 1000,
-        callBudget: 1000,
-        recurBudget: 10000,
+        loopBudget: 1000,
+        rangeBudget: 100,
+        callBudget: 100,
+        recurBudget: 100,
       },
       code,
       code,
       true,
     );
-    const errors = valOrErrs.kind === "errors" ? valOrErrs.errors : [];
+    const errors = "errors" in valOrErrs ? valOrErrs.errors : [];
     const okErr = (err || []).join() === errors.map(({ e }) => e).join();
     const okOut = !out || trim(state.output) === out;
     const elapsedMs = getTimeMs() - startTime;

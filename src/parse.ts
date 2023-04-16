@@ -294,7 +294,7 @@ function parseForm(
         { typ: "jmp", value: 1, errCtx },
         { typ: "val", value: nullVal, errCtx },
       ];
-    } else if (op === "match" || op == "satisfy") {
+    } else if (op === "match" || op === "satisfy") {
       const opIns: Ins["typ"] = op === "match" ? "mat" : "sat";
       const parsed = nodes.map(nodeParser);
       const [cond, args] = [parsed[0], slice(parsed, 1)];
@@ -378,7 +378,8 @@ function parseForm(
       if (!isToken(symNode)) {
         return err("argument 2 must be symbol");
       }
-      //(let sym 0 sym-limit n) ... body ... (if (< (let sym (inc sym)) sym-limit) <exit> <loo>)
+      //(let sym 0 sym-limit n) ... body ...
+      //(if (< (let sym (inc sym)) sym-limit) <exit> <loo>)
       const ins: ParserIns[] = [
         { typ: "val", value: { t: "num", v: 0 }, errCtx },
         { typ: "let", value: symNode.text, errCtx },
@@ -396,6 +397,51 @@ function parseForm(
         { typ: "if", value: 2, errCtx },
         { typ: "pop", value: 1, errCtx },
         { typ: "loo", value: -(len(body) + 10), errCtx },
+      ];
+      return ins;
+    } else if (op === "loop-over") {
+      if (len(nodes) < 3) {
+        return err("provide at least 3 arguments");
+      }
+      const parsed = nodes.map(nodeParser);
+      const symNode = nodes[1];
+      const body = poppedBody(slice(parsed, 2));
+      if (!isToken(symNode)) {
+        return err("argument 2 must be symbol");
+      }
+      //(when (empty? <item>) null <exit>)
+      //(let sym-item <item> sym-index 0 sym (sym-index sym-item)) ... body ...
+      //(if (< (let sym-index (inc sym-index)) (len sym-item)) <exit> <loo>)
+      const ins: ParserIns[] = [
+        ...parsed[0],
+        { typ: "val", value: { t: "func", v: "empty?" }, errCtx },
+        { typ: "exe", value: 1, errCtx },
+        { typ: "if", value: 2, errCtx },
+        { typ: "val", value: nullVal, errCtx },
+        { typ: "jmp", value: parsed[0].length + 9 + body.length + 12, errCtx },
+        ...parsed[0],
+        { typ: "let", value: symNode.text + "-item", errCtx },
+        { typ: "val", value: { t: "num", v: 0 }, errCtx },
+        { typ: "let", value: symNode.text + "-index", errCtx },
+        { typ: "jmp", value: 2, errCtx },
+        { typ: "ref", value: symNode.text + "-item", errCtx },
+        { typ: "ref", value: symNode.text + "-index", errCtx },
+        { typ: "exe", value: 1, errCtx },
+        { typ: "let", value: symNode.text, errCtx },
+        { typ: "pop", value: 1, errCtx },
+        ...body,
+        { typ: "ref", value: symNode.text + "-index", errCtx },
+        { typ: "val", value: { t: "func", v: "inc" }, errCtx },
+        { typ: "exe", value: 1, errCtx },
+        { typ: "let", value: symNode.text + "-index", errCtx },
+        { typ: "ref", value: symNode.text + "-item", errCtx },
+        { typ: "val", value: { t: "func", v: "len" }, errCtx },
+        { typ: "exe", value: 1, errCtx },
+        { typ: "val", value: { t: "func", v: "<" }, errCtx },
+        { typ: "exe", value: 2, errCtx },
+        { typ: "if", value: 2, errCtx },
+        { typ: "pop", value: 1, errCtx },
+        { typ: "loo", value: -(len(body) + 17), errCtx },
       ];
       return ins;
     } else if (op === "var" || op === "let") {
@@ -431,7 +477,7 @@ function parseForm(
       }
       return ins;
     } else if (op === "var!" || op === "let!") {
-      //Rewrite e.g. (var! a + 1) -> (var a (+ a 1))
+      //Rewrite e.g. (var! a + 1) -> (var a (+ 1 a))
       if (len(nodes) < 2) {
         return err("provide 1 declaration name and 1 function");
       }
@@ -440,11 +486,14 @@ function parseForm(
       if (def.typ !== "ref") {
         return err("declaration name must be symbol", def.errCtx);
       }
-      const ins: Ins[] = [{ typ: "ref", value: def.value, errCtx }];
-      push(ins, [...flat(args), ...func]);
-      ins.push({ typ: "exe", value: len(args) + 1, errCtx });
       const typ = op === "var!" ? "var" : "let";
-      ins.push({ typ, value: def.value, errCtx });
+      const ins: ParserIns[] = [
+        ...flat(args),
+        { typ: "ref", value: def.value, errCtx },
+        ...func,
+        { typ: "exe", value: len(args) + 1, errCtx },
+        { typ, value: def.value, errCtx },
+      ];
       return ins;
     } else if (op === "#" || op === "@" || op === "fn") {
       const pins: ParserIns[] = [];

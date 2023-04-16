@@ -11,9 +11,7 @@ export type Val =
 
 export type ErrCtx = { invokeId: string; line: number; col: number };
 export type InvokeError = { e: string; m: string; errCtx: ErrCtx };
-export type ValOrErr =
-  | { kind: "val"; value: Val }
-  | { kind: "err"; err: string };
+export type ValOrErr = Val | { err: string };
 /**
  * @summary "empty" occurs when there was only function declaration;
  *          "val" occurs when there were no errors and there is a final value;
@@ -21,7 +19,7 @@ export type ValOrErr =
  */
 export type InvokeResult =
   | { kind: "empty" }
-  | { kind: "val"; value: Val }
+  | Val
   | { kind: "errors"; errors: InvokeError[] };
 
 export type Dict = {
@@ -111,9 +109,9 @@ export type Operation = {
   hasEffects?: boolean;
   numeric?: true | "in only";
   params?: ("any" | Val["t"] | Val["t"][])[];
-  returns?: Val["t"][];
+  returns?: [Val["t"], ...Val["t"][]];
 };
-export type ExternalHandler = (params: Val[]) => ValOrErr;
+export type ExternalHandler = (params: Val[]) => ValOrErr | void;
 export type ExternalFunction = {
   definition: Operation;
   handler: ExternalHandler;
@@ -252,6 +250,7 @@ export const ops: {
   adj: { returns: ["clo"] },
   comp: { minArity: 2, returns: ["clo"] },
   toggle: { exactArity: 2, returns: ["clo"] },
+  criteria: { minArity: 2, returns: ["clo"] },
   map: { minArity: 2, returns: ["vec"] },
   "flat-map": { minArity: 2, returns: ["vec"] },
   xmap: {
@@ -381,6 +380,11 @@ export const ops: {
     params: ["num", ["vec", "str"]],
     returns: ["vec", "str"],
   },
+  trunc: {
+    exactArity: 2,
+    params: ["num", ["vec", "str"]],
+    returns: ["vec", "str"],
+  },
   crop: {
     exactArity: 3,
     params: ["num", "num", ["vec", "str"]],
@@ -412,6 +416,11 @@ export const ops: {
     exactArity: 2,
     params: ["num", ["vec", "str"]],
     returns: ["vec"],
+  },
+  "skip-each": {
+    exactArity: 2,
+    params: ["num", ["vec", "str"]],
+    returns: ["vec", "str"],
   },
   freqs: { exactArity: 1, params: [["vec", "str"]], returns: ["dict"] },
   keys: { exactArity: 1, params: ["dict"] },
@@ -466,22 +475,9 @@ export const ops: {
 };
 
 export const syntaxes = [
-  "function",
-  "fn",
-  "var",
-  "let",
-  "var!",
-  "let!",
-  "return",
-  "if",
-  "if!",
-  "when",
-  "unless",
-  "while",
-  "loop",
-  "match",
-  "satisfy",
-  "catch",
+  ...["function", "fn", "var", "let", "var!", "let!", "return", "if", "if!"],
+  ...["when", "unless", "while", "loop", "loop-over", "match", "satisfy"],
+  ...["catch", "args", "E", "PI"],
 ];
 
 export const typeNames = {
